@@ -1,10 +1,10 @@
 /**
  *   Google Calendar Service Manager
  *
- *   Author: scott, modified by qedi
+ *   Author: started with ecobee plugin by scott, 
+ *   modified by qedi
  *   Date: 2013-08-07
  *
- *  Last Sync from Ecobee: 2015-06-01
  */
 
 
@@ -48,7 +48,6 @@ mappings {
 
 def auth() {
    log.debug "auth()"
-   log.debug atomicState
    redirect location: oauthInitUrl()
 }
 
@@ -62,7 +61,6 @@ def authPage()
       createAccessToken()
       atomicState.accessToken = state.accessToken
    }
-
 
    def description = "Required"
    def uninstallAllowed = false
@@ -253,6 +251,7 @@ def initialize() {
    }
 
    runEvery30Minutes(pollHandler)
+   
    pollHandler()
 }
 
@@ -262,10 +261,11 @@ def pollHandler()
    def calendarsToCheck = getAllChildDevices()
    calendarsToCheck.each { cal ->
       def ev = getNextEvents(cal.deviceNetworkId)
+      log.debug "setting next event to trigger at "+ev.first().start.dateTime
       cal.setNextEvent(
-         ev.first().start.dateTime,
-         ev.first().end.dateTime,
-         ev.first().summary
+      	ev.first().start.dateTime,
+      	ev.first().end.dateTime,
+      	ev.first().summary
       )
    }
 }
@@ -341,7 +341,7 @@ def tokenRequest()
 }
 
 
-private refreshAuthToken(Closure fn) {
+private refreshAuthToken(Closure fn = {}) {
    log.debug "refreshing auth token"
    debugEvent("refreshing OAUTH token")
 
@@ -382,11 +382,8 @@ private refreshAuthToken(Closure fn) {
                log.debug resp.data
                debugEvent("Response = ${resp.data}")
 
-               atomicState.refreshToken = resp?.data?.refresh_token
-               atomicState.authToken = resp?.data?.access_token
-
-               debugEvent("Refresh Token = ${atomicState.refreshToken}")
                debugEvent("OAUTH Token = ${atomicState.authToken}")
+               atomicState.authToken = resp?.data?.access_token
 
                if(atomicState.action && atomicState.action != "") {
                   log.debug "Executing next action: ${atomicState.action}"
@@ -406,12 +403,18 @@ private refreshAuthToken(Closure fn) {
       }
    }
 }
+
 def checkAuthToken() {
+   log.debug "atomicstate:"
+   log.debug atomicState
+   log.debug "--"
    if(atomicState.authToken && 
       atomicState.refreshToken &&
-      // TODO: Check if it's valid
       true)
    {
+      return true;
+   } else if (atomicState.refreshToken) {
+   	  refreshAuthToken();
       return true;
    } else {
       return false;
@@ -430,7 +433,7 @@ def getCurrentTime() {
    def d = new Date()
    return String.format("%04d-%02d-%02dT%02d:%02d:%02d.000Z"
       , d.year+1900
-      , d.month
+      , d.month+1
       , d.day
       , d.hours
       , d.minutes
@@ -457,5 +460,6 @@ def debugEvent(message, displayEvent = false) {
    sendEvent (results)
 
 }
+
 
 
